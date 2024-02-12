@@ -349,4 +349,8 @@ button.onclick = () => {
   }
 };
 
+audio.onended = function() {
+  button.click();
+};
+
 init();
