@@ -108,6 +108,7 @@ function loop(replay) {
   // xRot += 0.2 * (dt / 1000) * Math.PI;
   yRot += 0.1 * (dt / 1000) * Math.PI;
   zRot += 0.2 * (dt / 1000) * Math.PI;  
+  xRot = zRot;
   
 
   // currentFPS = lerp(currentFPS, fps, 0.5);
