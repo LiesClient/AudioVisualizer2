@@ -3,18 +3,22 @@ const ctx = canvas.getContext("2d");
 
 const audio = document.getElementById("song");
 let actx, analyser, source, lastVolume = 0, lt = 0, maxFPS = 30, maxVolume = 0;
-
-let fpsPrev = [];
-let volPrev = [];
+let res = 512;
+// let fpsPrev = [];
+// let volPrev = [];
 
 const button = document.getElementById("play");
 
 const width = window.innerWidth;
 const height = window.innerHeight;
 const maxZ = Math.sqrt((width * 1) ** 2 + (height / 2) ** 2);
+const PHI = Math.PI * (Math.sqrt(5) - 1);
 
-let currentFPS = 0;
-let textHeight = 24;
+let xRot = 0;
+let yRot = 0;
+let zRot = 0;
+// let currentFPS = 0;
+// let textHeight = 24;
 
 let bottomLeftCube = new Cube(
   { x: width * 0.25, y: -height / 18 }, // panel 1
@@ -36,21 +40,9 @@ let topLeftCube = new Cube(
   1, // panel 1 foreground
   1 + ((width / 2 + 4 * (height / 18)) / maxZ), // panel 2 foregroubd
   1 + ((width / 3) / maxZ) * 6 // background,
-)
+);
 
 topLeftCube.setVanishingPoint(0, height - (2 * height / 3 - height / 18));
-
-// let bottomRightCube = new Cube(
-//   { x: width * 0.25, y: -height / 18 }, // panel 1
-//   { x: width * 0.25, y: height / 3 },
-//   { x: width * 0.75, y: -height / 18 }, // panel 2
-//   { x: width * 0.75, y: height / 3 },
-//   1, // panel 1 foreground
-//   1 + ((width / 2 + 4 * (height / 18)) / maxZ), // panel 2 foregroubd
-//   1 + ((width / 3) / maxZ) * 6 // background,
-// );
-
-// bottomRightCube.setVanishingPoint(width / 2, 2 * height / 3 - height / 18);
 
 let topRightCube = new Cube(
   { x: width * 0.25, y: height / 18 }, // panel 1
@@ -60,14 +52,28 @@ let topRightCube = new Cube(
   1, // panel 1 foreground
   1 + ((width / 2 + 4 * (height / 18)) / maxZ), // panel 2 foregroubd
   1 + ((width / 3) / maxZ) * 6 // background,
-)
+);
 
 topRightCube.setVanishingPoint(width / 2, height - (2 * height / 3 - height / 18));
+
+
+let bottomRightCube = new Cube(
+  { x: width * 0.25, y: -height / 18 }, // panel 1
+  { x: width * 0.25, y: height / 3 },
+  { x: width * 0.75, y: -height / 18 }, // panel 2
+  { x: width * 0.75, y: height / 3 },
+  1, // panel 1 foreground
+  1 + ((width / 2 + 4 * (height / 18)) / maxZ), // panel 2 foregroubd
+  1 + ((width / 3) / maxZ) * 6 // background,
+);
+
+bottomRightCube.setVanishingPoint(width / 2, 2 * height / 3 - height / 18);
+
 
 let panels = [
   ...bottomLeftCube.getPanels(),
   ...topLeftCube.getPanels(),
-  // ...bottomRightCube.getPanels(),
+  ...bottomRightCube.getPanels(),
   ...topRightCube.getPanels()
 ]
 
@@ -88,8 +94,8 @@ function init() {
   ctx.lineTo(width / 2, height);
   ctx.stroke();
 
-  ctx.font = `${textHeight}px monospace`;
-  ctx.textBaseline = "top";
+  // ctx.font = `${textHeight}px monospace`;
+  // ctx.textBaseline = "top";
   // bottomLeftCube.getPanels().forEach(panel => panel.strokeRect(0, 0.5, 1, 0));
 }
 
@@ -99,11 +105,16 @@ function loop(replay) {
   let fps = 1000 / dt;
   lt = time;
 
-  currentFPS = lerp(currentFPS, fps, 0.5);
+  // xRot += 0.2 * (dt / 1000) * Math.PI;
+  yRot += 0.1 * (dt / 1000) * Math.PI;
+  zRot += 0.2 * (dt / 1000) * Math.PI;  
+  
 
-  currentOffset += (dt / 1000) / 10;
+  // currentFPS = lerp(currentFPS, fps, 0.5);
 
-  if (currentFPS > maxFPS && currentFPS < 500) maxFPS = Math.round(fps);
+  // currentOffset += (dt / 1000) / 10;
+
+  // if (currentFPS > maxFPS && currentFPS < 500) maxFPS = Math.round(fps);
 
   if (audio.paused) {
     button.textContent = "Play";
@@ -155,6 +166,23 @@ function loop(replay) {
   ctx.translate(x, y);
 
   ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+  ctx.fillStyle = "rgba(255, 255, 255, 1)";
+
+  {
+    for (let i = 0; i < dataArray.length; i++) {
+      let y = ((i / (dataArray.length - 1) + (yRot / Math.PI)) % 1) * 2 - 1;
+      let r = Math.sqrt(1 - y * y);
+      let t = PHI * i;
+      let x = Math.cos(t + xRot) * r;
+      let z = Math.sin(t + zRot) * r;
+      let scale = (dataArray[i] / 128 - 1) * 0.5 + 0.5; // (-1, 1) -> (-.5, 0.5) -> (0, 1)
+      let zF = z * scale * 0.5 + 0.5;
+      let translated = bottomRightCube.translatePoint(x * scale * 0.5 + 0.5, y * 0.5 + 0.5, zF);
+      let s = 3 * zF + 1;
+
+      ctx.fillRect(translated.x - s / 2, translated.y - s / 2, s, s);
+    }
+  }
 
   {
     let getPoint = (i) => ({
@@ -281,44 +309,44 @@ function loop(replay) {
 
   ctx.fillStyle = "white";
 
-  let leftPad = (str, mNum) => {
-    if(str.length >= mNum) return str;
-    return leftPad(" " + str, mNum);
-  }
+  // let leftPad = (str, mNum) => {
+  //   if(str.length >= mNum) return str;
+  //   return leftPad(" " + str, mNum);
+  // }
 
-  let padAmount = 8;
-  let volStr = "Volume: " + leftPad((volume * 10).toFixed(2).toString(), padAmount);
+  // let padAmount = 8;
+  // let volStr = "Volume: " + leftPad((volume * 10).toFixed(2).toString(), padAmount);
 
-  ctx.fillText("FPS: " + leftPad(currentFPS.toFixed(2).toString(), padAmount + 3), width / 2 + textHeight / 2, height / 2 + textHeight / 2);
-  ctx.fillText(volStr, width / 2 + textHeight + (width / 2 - textHeight * 1.5) / 2, height / 2 + textHeight / 2);
+  // ctx.fillText("FPS: " + leftPad(currentFPS.toFixed(2).toString(), padAmount + 3), width / 2 + textHeight / 2, height / 2 + textHeight / 2);
+  // ctx.fillText(volStr, width / 2 + textHeight + (width / 2 - textHeight * 1.5) / 2, height / 2 + textHeight / 2);
 
-  ctx.strokeRect(width / 2 + textHeight / 2, height / 2 + textHeight * 2, (width / 2 - textHeight * 1.5) / 2, height / 2 - textHeight * 2.5);
-  ctx.strokeRect(width / 2 + textHeight + (width / 2 - textHeight * 1.5) / 2, height / 2 + textHeight * 2, (width / 2 - textHeight * 1.5) / 2, height / 2 - textHeight * 2.5);
+  // ctx.strokeRect(width / 2 + textHeight / 2, height / 2 + textHeight * 2, (width / 2 - textHeight * 1.5) / 2, height / 2 - textHeight * 2.5);
+  // ctx.strokeRect(width / 2 + textHeight + (width / 2 - textHeight * 1.5) / 2, height / 2 + textHeight * 2, (width / 2 - textHeight * 1.5) / 2, height / 2 - textHeight * 2.5);
 
-  let max_fps = Math.max(...fpsPrev);
-  let max_vol = Math.max(...volPrev);
-  
-  ctx.beginPath();
-  for (let i = 0; i < fpsPrev.length; i++) {
-    let x = width / 2 + textHeight / 2 + (i / fpsPrev.length) * (width / 2 - textHeight * 1.5) / 2
-    let y = height / 2 + textHeight * 2 + (1 - fpsPrev[i] / max_fps) * (height / 2 - textHeight * 2.5);
-    ctx.lineTo(x, y);
-  }
-  ctx.stroke();
+  // let max_fps = Math.max(...fpsPrev);
+  // let max_vol = Math.max(...volPrev);
 
-  ctx.beginPath();
-  for (let i = 0; i < volPrev.length; i++) {
-    let x = width / 2 + textHeight + (width / 2 - textHeight * 1.5) / 2 + (i / fpsPrev.length) * (width / 2 - textHeight * 1.5) / 2
-    let y = height / 2 + textHeight * 2 + (1 - volPrev[i] / max_vol) * (height / 2 - textHeight * 2.5);
-    ctx.lineTo(x, y);
-  }
-  ctx.stroke();
+  // ctx.beginPath();
+  // for (let i = 0; i < fpsPrev.length; i++) {
+  //   let x = width / 2 + textHeight / 2 + (i / fpsPrev.length) * (width / 2 - textHeight * 1.5) / 2
+  //   let y = height / 2 + textHeight * 2 + (1 - fpsPrev[i] / max_fps) * (height / 2 - textHeight * 2.5);
+  //   ctx.lineTo(x, y);
+  // }
+  // ctx.stroke();
 
-  fpsPrev.push(currentFPS);
-  volPrev.push(volume);
+  // ctx.beginPath();
+  // for (let i = 0; i < volPrev.length; i++) {
+  //   let x = width / 2 + textHeight + (width / 2 - textHeight * 1.5) / 2 + (i / fpsPrev.length) * (width / 2 - textHeight * 1.5) / 2
+  //   let y = height / 2 + textHeight * 2 + (1 - volPrev[i] / max_vol) * (height / 2 - textHeight * 2.5);
+  //   ctx.lineTo(x, y);
+  // }
+  // ctx.stroke();
 
-  if (fpsPrev.length > Math.ceil((width / 2 - textHeight * 1.5) / 2)) fpsPrev.shift();
-  if (volPrev.length > Math.ceil((width / 2 - textHeight * 1.5) / 2)) volPrev.shift();
+  // fpsPrev.push(currentFPS);
+  // volPrev.push(volume);
+
+  // if (fpsPrev.length > Math.ceil((width / 2 - textHeight * 1.5) / 2)) fpsPrev.shift();
+  // if (volPrev.length > Math.ceil((width / 2 - textHeight * 1.5) / 2)) volPrev.shift();
 
   lastVolume = volume;
 
@@ -335,7 +363,7 @@ button.onclick = () => {
 
     source.connect(analyser);
     source.connect(actx.destination);
-    analyser.fftSize = 512;
+    analyser.fftSize = res;
 
     try { loop(); } catch (e) { document.write(e); }
   }
@@ -347,10 +375,6 @@ button.onclick = () => {
     audio.pause();
     button.textContent = "Play";
   }
-};
-
-audio.onended = function() {
-  button.click();
 };
 
 init();
